@@ -1,1 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  
+  /* Slate Theme Overrides (Dark to Light mapping) */
+  --color-slate-950: #f8fafc; /* Base background (slate-50 equivalent) */
+  --color-slate-900: #ffffff; /* Card / Panel background (white) */
+  --color-slate-850: #f1f5f9; /* Light row hover background */
+  --color-slate-800: #e2e8f0; /* Dividing lines and outer borders */
+  --color-slate-700: #cbd5e1; /* Secondary borders */
+  --color-slate-600: #94a3b8; /* Inactive borders */
+  --color-slate-500: #64748b; /* Muted labels */
+  --color-slate-400: #475569; /* Secondary body text */
+  --color-slate-300: #334155; /* Normal body text */
+  --color-slate-200: #1e293b; /* Section headings */
+  --color-slate-100: #0f172a; /* Title text */
+
+  /* Light Accent Background Overrides (950 maps to light backgrounds) */
+  --color-blue-950: #eff6ff;
+  --color-rose-950: #fff1f2;
+  --color-amber-950: #fef3c7;
+  --color-purple-950: #faf5ff;
+  --color-indigo-950: #eef2ff;
+  --color-emerald-950: #ecfdf5;
+  --color-cyan-950: #ecfeff;
+
+  /* Accent Text Contrast Overrides (400 maps to readable dark text) */
+  --color-blue-400: #1d4ed8;    /* blue-700 */
+  --color-rose-400: #be123c;    /* rose-700 */
+  --color-amber-400: #b45309;   /* amber-700 */
+  --color-emerald-400: #047857; /* emerald-700 */
+  --color-purple-400: #6d28d9;  /* purple-700 */
+  --color-indigo-400: #4338ca;  /* indigo-700 */
+  --color-cyan-400: #0e7490;    /* cyan-700 */
+}
+
+/* Custom global styles for smooth, high-end aesthetics */
+body {
+  background-color: var(--color-slate-950);
+  color: var(--color-slate-300);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Custom premium styling for inputs */
+input, textarea, select {
+  background-color: var(--color-slate-900) !important;
+  color: var(--color-slate-100) !important;
+  border-color: var(--color-slate-800) !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-slate-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-800);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-700);
+}

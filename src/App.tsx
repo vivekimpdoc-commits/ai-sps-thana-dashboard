@@ -581,7 +581,7 @@ export default function App() {
                 SPS
               </div>
               <div>
-                <h1 className="font-black text-sm tracking-tight text-white uppercase leading-tight">Armoury AI</h1>
+                <h1 className="font-black text-sm tracking-tight text-slate-100 uppercase leading-tight">Armoury AI</h1>
                 <p className="text-[10px] text-slate-500 font-semibold mt-0.5 tracking-wider uppercase">Kotwali Noida</p>
               </div>
             </div>
@@ -729,7 +729,7 @@ export default function App() {
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   {isHindi ? "सक्रिय बल ड्यूटी" : "Active On-Duty Force"}
                 </div>
-                <div className="text-base font-black text-white mt-0.5">
+                <div className="text-base font-black text-slate-100 mt-0.5">
                   {db.personnel.filter(p => p.dutyStatus !== "Off Duty").length} / {db.personnel.length} Offs
                 </div>
               </div>
@@ -738,7 +738,7 @@ export default function App() {
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   {isHindi ? "थाना कोड" : "Police Station Code"}
                 </div>
-                <div className="text-base font-black text-white mt-0.5 font-mono">
+                <div className="text-base font-black text-slate-100 mt-0.5 font-mono">
                   Kotwali Noida-Phase II
                 </div>
               </div>
@@ -832,7 +832,7 @@ export default function App() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{isHindi ? "केस / FIR रिकॉर्ड" : "Lodge Registers"}</p>
-                        <h3 className="text-2xl font-black text-white mt-1">{db.firs.length}</h3>
+                        <h3 className="text-2xl font-black text-slate-100 mt-1">{db.firs.length}</h3>
                       </div>
                       <Shield className="w-5 h-5 text-blue-400" />
                     </div>
@@ -850,7 +850,7 @@ export default function App() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{isHindi ? "लॉकअप की सुरक्षा" : "Custody Guard"}</p>
-                        <h3 className="text-2xl font-black text-white mt-1">{db.lockup.length}</h3>
+                        <h3 className="text-2xl font-black text-slate-100 mt-1">{db.lockup.length}</h3>
                       </div>
                       <Lock className="w-5 h-5 text-amber-400" />
                     </div>
@@ -868,7 +868,7 @@ export default function App() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{isHindi ? "ऑन-ड्यूटी हथियार" : "Armoury Assigned"}</p>
-                        <h3 className="text-2xl font-black text-white mt-1">
+                        <h3 className="text-2xl font-black text-slate-100 mt-1">
                           {db.armoury.reduce((sum, item) => sum + item.out, 0)} out
                         </h3>
                       </div>
@@ -888,7 +888,7 @@ export default function App() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{isHindi ? "मालखाना साक्ष्य सामान" : "Malkhana Seized Log"}</p>
-                        <h3 className="text-2xl font-black text-white mt-1">{db.malkhana.length} items</h3>
+                        <h3 className="text-2xl font-black text-slate-100 mt-1">{db.malkhana.length} items</h3>
                       </div>
                       <Tag className="w-5 h-5 text-indigo-400" />
                     </div>
