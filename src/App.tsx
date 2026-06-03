@@ -124,6 +124,56 @@ export default function App() {
   // Time stamp state
   const [currentTimeStamp, setCurrentTimeStamp] = useState<string>("11:49:05 IST");
 
+  // Gemini API Key state
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem("thana_gemini_api_key") || "";
+  });
+  const handleApiKeyChange = (key: string) => {
+    setGeminiApiKey(key);
+    localStorage.setItem("thana_gemini_api_key", key);
+  };
+
+  // Helper for client-side Gemini API calls
+  const callGeminiClientSide = async (systemPrompt: string, promptText: string, isJson: boolean = false) => {
+    const key = geminiApiKey.trim();
+    if (!key) {
+      throw new Error(isHindi 
+        ? "Gemini API Key नहीं मिली। कृपया टॉप बार में अपनी API Key दर्ज करें।" 
+        : "Gemini API Key is missing. Please add your key in the top settings bar.");
+    }
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }],
+        generationConfig: isJson ? {
+          responseMimeType: "application/json",
+          temperature: 0.2
+        } : {
+          temperature: 0.5
+        },
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error?.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error("Empty response from Gemini API");
+    }
+    return text;
+  };
+
   // Crime GPT states
   const [complainantInput, setComplainantInput] = useState<string>("");
   const [speechNarration, setSpeechNarration] = useState<string>("");
@@ -183,9 +233,20 @@ export default function App() {
       if (res.ok) {
         const serverData = await res.json();
         setDb(serverData);
+        localStorage.setItem("thana_db", JSON.stringify(serverData));
+      } else {
+        throw new Error("Failed to load db from API");
       }
     } catch (e) {
       console.warn("Database fallback loaded. Running as client-side dynamic instance.", e);
+      const cached = localStorage.getItem("thana_db");
+      if (cached) {
+        try {
+          setDb(JSON.parse(cached));
+        } catch (err) {
+          console.error("Failed to parse cached db", err);
+        }
+      }
     }
   };
 
@@ -201,27 +262,55 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const response = await fetch("/api/copilot/draft-fir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          complainantName: complainantInput || "Walk-In Complainant",
-          offenseDetails: speechNarration,
-          callerState: "Uttar Pradesh / NCR Kotwali Area",
-          currentThana: "Sector-5 Thana"
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setDraftResult(data);
+      const useClientSide = geminiApiKey.trim() !== "";
+      let data;
+      if (useClientSide) {
+        const systemPrompt = `You are a specialist Indian Legal Counsel and Police Advisor trained in Bharatiya Nyaya Sanhita (BNS - new Indian penal laws) and Indian Penal Code (IPC). Your job is to convert raw speech or text complaint narrations into a meticulously structured, legally sound Indian Police First Information Report (FIR) Draft. All outputs MUST include:
+1. Recommended legal action sections (e.g. BNS Sections with equivalent old IPC equivalents, details on whether cognitive).
+2. A formal, structured investigation draft in Hindi (हिन्दी ड्राफ्ट).
+3. A formal, structured investigation draft in English (English Draft).
+4. Recommended rapid next-steps/action points for the Investigating Officer (IO).
+
+Formulate your response in VALID and strict JSON matching this schema:
+{
+  "complainant": "Extracted Complainant name and age",
+  "suspect": "Extracted Suspect Description, vehicle identifiers, or unknown, etc.",
+  "legalSections": "Explicit Section designation under BNS (with previous IPC in bracket, e.g. BNS 115(2) [IPC 323])",
+  "hindiDraft": "Hindi formal complaint narrative formatted like Kotwali registers",
+  "englishDraft": "English formal investigative narrative with appropriate structure",
+  "priority": "High | Medium | Low based on immediate threat or public risk",
+  "nextSteps": ["List of steps for police personnel, e.g. check CCTV, notify border, send forensic team"]
+}`;
+        const prompt = `Complainant: ${complainantInput || "Not fully specified / Walk-in Witness"}
+District/Thana context: Sector Thana, Kotwali in State: NCT Delhi/Uttar Pradesh area
+Incident Narration details: "${speechNarration}"
+
+Draft a professional, authoritative Indian Police FIR in JSON.`;
+        
+        const resultText = await callGeminiClientSide(systemPrompt, prompt, true);
+        data = JSON.parse(resultText.trim());
       } else {
-        // Fallback implementation in case GEMINI_API_KEY is missing
-        if (data.fallback) {
-          setDraftResult(data.fallback);
-        } else {
+        const response = await fetch("/api/copilot/draft-fir", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            complainantName: complainantInput || "Walk-In Complainant",
+            offenseDetails: speechNarration,
+            callerState: "Uttar Pradesh / NCR Kotwali Area",
+            currentThana: "Sector-5 Thana"
+          })
+        });
+        data = await response.json();
+        if (!response.ok) {
+          if (data.fallback) {
+            setDraftResult(data.fallback);
+            setLoading(false);
+            return;
+          }
           throw new Error("Unable to fetch draft.");
         }
       }
+      setDraftResult(data);
     } catch (err: any) {
       console.error(err);
       setErrorText("Gemini Connection Error. Displaying offline-safe Indian Legal Draft.");
@@ -274,6 +363,8 @@ export default function App() {
         setSpeechNarration("");
         setDraftResult(null);
         setActiveTab("dashboard");
+      } else {
+        throw new Error("Failed to save draft to API");
       }
     } catch (e) {
       // Offline fallback state update
@@ -281,10 +372,14 @@ export default function App() {
         ...draftResult,
         status: "Active"
       };
-      setDb((prev) => ({
-        ...prev,
-        firs: [localNewFir, ...prev.firs]
-      }));
+      setDb((prev) => {
+        const updated = {
+          ...prev,
+          firs: [localNewFir, ...prev.firs]
+        };
+        localStorage.setItem("thana_db", JSON.stringify(updated));
+        return updated;
+      });
       alert(isHindi ? "ऑफ़लाइन मोड: एफआईआर को स्थानीय रूप से सेव कर लिया गया है!" : "Offline Mode: Registered FIR in local state!");
       setComplainantInput("");
       setSpeechNarration("");
@@ -299,18 +394,70 @@ export default function App() {
   const handleOptimizeRoster = async () => {
     setAiOptimizing(true);
     try {
-      const response = await fetch("/api/copilot/suggest-roster", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shiftStructure: "3 Shifts standard daily policing code",
-          localPersonnelList: JSON.stringify(db.personnel),
-          specialNotes: rosterNotes || "Minimize consecutive graveyard shifts. Assign active officers and balanced teams."
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        // Now save optimized roster to db
+      const useClientSide = geminiApiKey.trim() !== "";
+      let data;
+      if (useClientSide) {
+        const systemPrompt = `You are "Schedule AI / Duty Roster Optimizer" for Kotwali Police Stations. Your assignment is to distribute police officers intelligently across three main shifts:
+- Morning Shift (06:00 AM - 02:00 PM)
+- Evening Shift (02:00 PM - 10:00 PM)
+- Night Guard / Patrol Shift (10:00 PM - 06:00 AM)
+
+Based on the personnel provided, match officers to duties. E.g. senior SHO oversees general station, junior Constables assigned to patrols and lockup guards. High-risk areas or night shift requires alert personnel. Use custom local constraints or special notes requested.
+
+Return valid JSON in this schema:
+[
+  {
+    "shift": "Morning Shift (06:00 AM - 02:00 PM)",
+    "personnel": ["Officer Name 1", "Officer Name 2"],
+    "task": "Specific strategic focus/task assigned to this shift"
+  },
+  {
+    "shift": "Evening Shift (02:00 PM - 10:00 PM)",
+    "personnel": ["Officer Name 3", "Officer Name 4"],
+    "task": "Strategic area deployment"
+  },
+  {
+    "shift": "Night Guard Shift (10:00 PM - 06:00 AM)",
+    "personnel": ["Officer Name 5"],
+    "task": "Night patrol priority details"
+  }
+]`;
+        const personnelInfo = JSON.stringify(db.personnel);
+        const notes = rosterNotes || "Ensure optimal distribution. Keep senior SHO in station, assign constables to active beat patrols.";
+        const prompt = `Available Personnel List: ${personnelInfo}
+Shift guidelines/notes: "${notes}"
+
+Generate a balanced duty allocation for a safe Thana district environment. Return JSON only.`;
+
+        const resultText = await callGeminiClientSide(systemPrompt, prompt, true);
+        data = JSON.parse(resultText.trim());
+      } else {
+        const response = await fetch("/api/copilot/suggest-roster", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shiftStructure: "3 Shifts standard daily policing code",
+            localPersonnelList: JSON.stringify(db.personnel),
+            specialNotes: rosterNotes || "Minimize consecutive graveyard shifts. Assign active officers and balanced teams."
+          })
+        });
+        data = await response.json();
+        if (!response.ok) {
+          if (data.fallback) {
+            setDb(prev => {
+              const newDb = { ...prev, dutyRoster: data.fallback };
+              localStorage.setItem("thana_db", JSON.stringify(newDb));
+              return newDb;
+            });
+            setAiOptimizing(false);
+            return;
+          }
+          throw new Error("Failed to optimize roster");
+        }
+      }
+
+      // Save optimized roster to db
+      try {
         const saveRes = await fetch("/api/db/roster/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -320,22 +467,33 @@ export default function App() {
           await syncDatabase();
           alert(isHindi ? "एआई ने ड्यूटी रोस्टर को अनुकूलित व अपडेट कर दिया है!" : "Success! AI has fully optimized and committed the new roster!");
         } else {
-          setDb(prev => ({ ...prev, dutyRoster: data }));
+          setDb(prev => {
+            const newDb = { ...prev, dutyRoster: data };
+            localStorage.setItem("thana_db", JSON.stringify(newDb));
+            return newDb;
+          });
         }
-      } else if (data.fallback) {
-        setDb(prev => ({ ...prev, dutyRoster: data.fallback }));
-        alert(isHindi ? "एआई रोस्टर अनुकूलित किया गया (सुरक्षित स्थानीय प्रारूप)!" : "AI Roster Generated (Fallback Active)!");
+      } catch (saveErr) {
+        setDb(prev => {
+          const newDb = { ...prev, dutyRoster: data };
+          localStorage.setItem("thana_db", JSON.stringify(newDb));
+          return newDb;
+        });
+        alert(isHindi ? "ड्यूटी रोस्टर स्थानीय रूप से अपडेट किया गया!" : "Duty roster updated locally!");
       }
     } catch (e) {
-      alert("AI optimization failed to reach the server. Applying offline rotation algorithm.");
-      // Shuffles array slightly for simulation
+      alert("AI optimization failed. Applying offline rotation algorithm.");
       const shuffled = [...db.dutyRoster].map((item, idx) => ({
         ...item,
         task: idx === 0 
           ? "Heavy Traffic & Market Patrols (" + (rosterNotes || "Optimized Level") + ")" 
           : item.task
       }));
-      setDb(prev => ({ ...prev, dutyRoster: shuffled }));
+      setDb(prev => {
+        const newDb = { ...prev, dutyRoster: shuffled };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
     } finally {
       setAiOptimizing(false);
     }
@@ -393,6 +551,8 @@ export default function App() {
         await syncDatabase();
         setNewSafetyStatus("");
         alert(isHindi ? "लॉकअप सुरक्षा रजिस्टर अपडेट किया गया!" : "Hourly lockup safety checklist submitted!");
+      } else {
+        throw new Error("Failed to save check");
       }
     } catch (e) {
       // Local check entry fallback
@@ -409,7 +569,9 @@ export default function App() {
           }
           return l;
         });
-        return { ...prev, lockup: updated };
+        const newDb = { ...prev, lockup: updated };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
       });
       setNewSafetyStatus("");
       alert(isHindi ? "स्थानीय लॉकअप एंट्री दर्ज!" : "Local lockup safety check noted.");
@@ -442,6 +604,8 @@ export default function App() {
         setNewMalkhanaCaseRef("");
         setNewMalkhanaNo("");
         alert(isHindi ? "मालखाना रजिस्टर में नई वस्तु दर्ज!" : "New exhibit item categorized into Thana Malkhana vaults.");
+      } else {
+        throw new Error("Failed to add Malkhana item");
       }
     } catch (err) {
       // Local state fallback
@@ -456,10 +620,14 @@ export default function App() {
         status: newMalkhanaStatus,
         safeLevel: "Sealed & Vaulted"
       };
-      setDb((prev) => ({
-        ...prev,
-        malkhana: [fakeItem, ...prev.malkhana]
-      }));
+      setDb((prev) => {
+        const newDb = {
+          ...prev,
+          malkhana: [fakeItem, ...prev.malkhana]
+        };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
       setNewMalkhanaTitle("");
       setNewMalkhanaCaseRef("");
       setNewMalkhanaNo("");
@@ -483,6 +651,8 @@ export default function App() {
         await syncDatabase();
         setNewBeatLogText("");
         alert(isHindi ? "बीट रोजनामचा अपडेट सम्पन्न!" : "Beat log successfully saved!");
+      } else {
+        throw new Error("Failed to add beat log");
       }
     } catch (e) {
       setDb((prev) => {
@@ -495,7 +665,9 @@ export default function App() {
           }
           return b;
         });
-        return { ...prev, beatBooks: updated };
+        const newDb = { ...prev, beatBooks: updated };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
       });
       setNewBeatLogText("");
     }
@@ -520,16 +692,36 @@ export default function App() {
     if (!advisorQuery.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/copilot/consult", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: advisorQuery,
-          category: advisorCategory
-        })
-      });
-      const data = await res.json();
-      setAdvisorResponse(data.answer);
+      const useClientSide = geminiApiKey.trim() !== "";
+      let answer;
+      if (useClientSide) {
+        const systemPrompt = `You are "AI-SPS Copilot" - the premium digital assistant for station house officers (SHOs), sub-inspectors, and duty officers in India.
+You provide advice under Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), and Bharatiya Sakshya Adhiniyam (BSA). You can also answer operational questions on:
+1. Armoury security management and weapon check logs.
+2. In-Lockup inmate protection, safety check procedures, and suicide-prevention policies.
+3. Seized property "Malkhana" tracking procedures, chemical labeling, and evidence vaults.
+4. Beat Book maintenance, digital patrols, and high-crime hotspot analysis.
+
+Answer in a direct, clear, highly legal yet practical manner. Use neat bullet points, list relevant sections, and support bilingual inputs. E.g. if requested in Hindi, explain in beautiful legal Hindi with English section keywords in brackets. Maintain a professional, helpful, objective, administrative tone.`;
+        const prompt = `Category context: ${advisorCategory || "General Policing / Law Counsel"}. Question: "${advisorQuery}"`;
+        
+        answer = await callGeminiClientSide(systemPrompt, prompt, false);
+      } else {
+        const res = await fetch("/api/copilot/consult", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: advisorQuery,
+            category: advisorCategory
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error("Failed to consult");
+        }
+        answer = data.answer;
+      }
+      setAdvisorResponse(answer);
     } catch (e) {
       setAdvisorResponse("AI Law Database unreachable. Summary rules: Ensure immediate care for lockup inmates. Seized cash must be double-locked in Godrej safe vaults in presence of magistrate. Standard firearms sign-out must always have countersignatures of SI.");
     } finally {
@@ -552,6 +744,18 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Gemini API Key Input */}
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700/60 rounded px-2.5 py-1 text-xs">
+            <span className="text-slate-400">🔑 Key:</span>
+            <input
+              type="password"
+              placeholder="Gemini API Key..."
+              value={geminiApiKey}
+              onChange={(e) => handleApiKeyChange(e.target.value)}
+              className="bg-transparent border-none outline-none text-slate-100 text-xs w-28 placeholder-slate-500"
+            />
+          </div>
+
           {/* Universal Language Toggle */}
           <button
             onClick={() => setIsHindi(!isHindi)}
