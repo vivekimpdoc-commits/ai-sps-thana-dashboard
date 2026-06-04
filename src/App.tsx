@@ -26,7 +26,9 @@ import {
   Check,
   Power,
   RotateCcw,
-  Sliders
+  Sliders,
+  Menu,
+  X
 } from "lucide-react";
 import { ThanaDatabase, Personnel, LockupInmate, ArmouryItem, MalkhanaItem, BeatBookItem, DutyRosterItem, FirDraft } from "./types";
 
@@ -36,6 +38,7 @@ export default function App() {
   const [isHindi, setIsHindi] = useState<boolean>(true); // Prioritize Hindi as requested, single toggle to English
   const [loading, setLoading] = useState<boolean>(false);
   const [errorText, setErrorText] = useState<string>("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // DB State (With detailed fallbacks matching exact schema)
   const [db, setDb] = useState<ThanaDatabase>({
@@ -923,12 +926,141 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
           </div>
         </aside>
 
+        {/* Mobile Navigation Drawer */}
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col h-full">
+              <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white tracking-widest shadow-lg shadow-blue-900/30">
+                    SPS
+                  </div>
+                  <div>
+                    <h1 className="font-black text-sm tracking-tight text-slate-100 uppercase leading-tight">Armoury AI</h1>
+                    <p className="text-[10px] text-slate-500 font-semibold mt-0.5 tracking-wider uppercase">Kotwali Noida</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-200 focus:outline-none"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+                <button
+                  onClick={() => { setActiveTab("dashboard"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "dashboard" ? "bg-slate-900 text-blue-400 border-r-4 border-blue-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">📊</span>
+                    <span>{isHindi ? "थाना डैशबोर्ड" : "Station Dashboard"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("crime-gpt"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "crime-gpt" ? "bg-slate-900 text-rose-400 border-r-4 border-rose-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">🎙️</span>
+                    <span>{isHindi ? "आवाज से FIR ड्राफ्ट" : "Crime GPT Copilot"}</span>
+                  </div>
+                  <span className="bg-rose-950 text-rose-400 text-[8px] font-mono px-1.5 py-0.5 rounded border border-rose-900/50 uppercase font-black tracking-widest">
+                    AI Live
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("lockup"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "lockup" ? "bg-slate-900 text-amber-400 border-r-4 border-amber-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">🔐</span>
+                    <span>{isHindi ? "स्मार्ट लॉकअप गार्ड" : "Smart Lockup Guard"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("armoury"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "armoury" ? "bg-slate-900 text-purple-400 border-r-4 border-purple-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">🛡️</span>
+                    <span>{isHindi ? "स्मार्ट आयुध भंडार" : "Armoury AI Tracker"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("malkhana"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "malkhana" ? "bg-slate-900 text-indigo-400 border-r-4 border-indigo-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">📦</span>
+                    <span>{isHindi ? "मालखाना ट्रैकर" : "Evidence Malkhana"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("roster"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "roster" ? "bg-slate-900 text-emerald-450 border-r-4 border-emerald-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">🗓️</span>
+                    <span>{isHindi ? "ड्यूटी रोस्टर" : "Smart Scheduling"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("beat"); setIsMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-6 py-3 text-left font-medium text-xs transition duration-150 ${
+                    activeTab === "beat" ? "bg-slate-900 text-cyan-400 border-r-4 border-cyan-500 font-bold" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">📖</span>
+                    <span>{isHindi ? "डिजिटल बीट बुक" : "Digital Beat Book"}</span>
+                  </div>
+                  <ChevronRight className="w-3 h-3 text-slate-600" />
+                </button>
+              </nav>
+            </div>
+            {/* Backdrop click to close */}
+            <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)}></div>
+          </div>
+        )}
+
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col overflow-y-auto bg-slate-900 bg-opacity-30">
           
           {/* Top Status Header Grid */}
           <header className="border-b border-slate-800 bg-slate-950/80 px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-0 z-40 backdrop-blur-md">
             <div className="flex flex-wrap items-center gap-6">
+              {/* Mobile Hamburger Menu Toggle */}
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-1.5 -ml-1 text-slate-400 hover:text-slate-200 bg-slate-900 rounded-md border border-slate-800"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
               <div>
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   {isHindi ? "सक्रिय बल ड्यूटी" : "Active On-Duty Force"}
@@ -939,7 +1071,7 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
               </div>
               <div className="h-8 w-px bg-slate-800 hidden md:block"></div>
               <div>
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                <div className="text-[10px] text-slate-555 uppercase font-bold tracking-wider">
                   {isHindi ? "थाना कोड" : "Police Station Code"}
                 </div>
                 <div className="text-base font-black text-slate-100 mt-0.5 font-mono">
@@ -951,7 +1083,7 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
                 <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
                   {isHindi ? "थाना अलर्ट स्तर" : "Alert Priority Quotient"}
                 </div>
-                <div className="text-sm font-bold text-emerald-400 mt-0.5 flex items-center gap-1.5 bg-emerald-950/60 px-2.5 py-0.5 rounded border border-emerald-900/30">
+                <div className="text-sm font-bold text-emerald-450 mt-0.5 flex items-center gap-1.5 bg-emerald-950/60 px-2.5 py-0.5 rounded border border-emerald-900/30">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                   NORMAL & SECTORED
                 </div>
@@ -971,49 +1103,49 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
             </div>
           </header>
 
-          {/* Quick tab nav for mobile layout */}
-          <div className="bg-slate-950 p-2 border-b border-slate-800 grid grid-cols-4 sm:grid-cols-7 gap-1 lg:hidden text-[10px]">
+          {/* Quick tab nav for mobile layout (horizontal scrollable pills) */}
+          <div className="bg-slate-950 py-2 px-3 border-b border-slate-800 flex overflow-x-auto gap-2 lg:hidden text-[10px] scrollbar-none whitespace-nowrap">
             <button 
               onClick={() => setActiveTab("dashboard")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'dashboard' ? 'bg-slate-900 text-blue-400 font-bold border-b border-blue-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'dashboard' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "डैशबोर्ड" : "HQ Board"}
+              📊 {isHindi ? "डैशबोर्ड" : "HQ Board"}
             </button>
             <button 
               onClick={() => setActiveTab("crime-gpt")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'crime-gpt' ? 'bg-rose-950 text-rose-400 font-bold border-b border-rose-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'crime-gpt' ? 'bg-rose-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "FIR" : "Crime GPT"}
+              🎙️ {isHindi ? "FIR ड्राफ्ट" : "Crime GPT"}
             </button>
             <button 
               onClick={() => setActiveTab("lockup")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'lockup' ? 'bg-amber-950 text-amber-400 font-bold border-b border-amber-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'lockup' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "लॉकअप" : "Lockup"}
+              🔐 {isHindi ? "लॉकअप" : "Lockup"}
             </button>
             <button 
               onClick={() => setActiveTab("armoury")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'armoury' ? 'bg-slate-900 text-purple-400 font-bold border-b border-purple-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'armoury' ? 'bg-purple-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "आयुध" : "Armoury"}
+              🛡️ {isHindi ? "आयुध" : "Armoury"}
             </button>
             <button 
               onClick={() => setActiveTab("malkhana")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'malkhana' ? 'bg-slate-900 text-indigo-400 font-bold border-b border-indigo-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'malkhana' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "मालखाना" : "Malkhana"}
+              📦 {isHindi ? "मालखाना" : "Malkhana"}
             </button>
             <button 
               onClick={() => setActiveTab("roster")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'roster' ? 'bg-slate-900 text-emerald-400 font-bold border-b border-emerald-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'roster' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "रोस्टर" : "Roster"}
+              🗓️ {isHindi ? "रोस्टर" : "Roster"}
             </button>
             <button 
               onClick={() => setActiveTab("beat")} 
-              className={`p-2 rounded text-center font-medium ${activeTab === 'beat' ? 'bg-slate-900 text-cyan-400 font-bold border-b border-cyan-500' : 'text-slate-400'}`}
+              className={`py-1.5 px-3 rounded-full font-medium shrink-0 transition ${activeTab === 'beat' ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}
             >
-              {isHindi ? "बीट" : "Beat"}
+              📖 {isHindi ? "बीट" : "Beat"}
             </button>
           </div>
 

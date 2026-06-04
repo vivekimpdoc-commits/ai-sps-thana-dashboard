@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import net from "net";
 
 process.env.DISABLE_HMR = "true";
+process.env.NODE_ENV = "development";
 dotenv.config();
 
 const app = express();
