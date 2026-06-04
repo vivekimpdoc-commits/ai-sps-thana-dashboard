@@ -3,13 +3,15 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import net from "net";
 
+process.env.DISABLE_HMR = "true";
 dotenv.config();
 
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Lazy initialization of Gemini API Client
 let aiClient: GoogleGenAI | null = null;
@@ -402,6 +404,20 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
   }
 });
 
+function findFreePort(startPort: number): Promise<number> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.on("error", () => {
+      resolve(findFreePort(startPort + 1));
+    });
+    server.listen(startPort, "0.0.0.0", () => {
+      server.close(() => {
+        resolve(startPort);
+      });
+    });
+  });
+}
+
 // Vite Middleware Integration for Dev / Prod Fallback
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -420,8 +436,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running securely on http://0.0.0.0:${PORT}`);
+  const freePort = await findFreePort(PORT);
+  app.listen(freePort, "0.0.0.0", () => {
+    console.log(`Server running securely on http://0.0.0.0:${freePort}`);
   });
 }
 
