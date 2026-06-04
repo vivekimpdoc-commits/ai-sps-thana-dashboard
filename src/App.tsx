@@ -28,7 +28,8 @@ import {
   RotateCcw,
   Sliders,
   Menu,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 import { ThanaDatabase, Personnel, LockupInmate, ArmouryItem, MalkhanaItem, BeatBookItem, DutyRosterItem, FirDraft } from "./types";
 
@@ -189,6 +190,13 @@ export default function App() {
   // Smart Scheduling states
   const [rosterNotes, setRosterNotes] = useState<string>("");
   const [aiOptimizing, setAiOptimizing] = useState<boolean>(false);
+  const [newPersonnelName, setNewPersonnelName] = useState<string>("");
+  const [newPersonnelRank, setNewPersonnelRank] = useState<string>("Constable");
+  const [newPersonnelBadge, setNewPersonnelBadge] = useState<string>("");
+  const [newPersonnelStatus, setNewPersonnelStatus] = useState<string>("On Station");
+  const [newRosterShift, setNewRosterShift] = useState<string>("Morning Shift (06:00 AM - 02:00 PM)");
+  const [newRosterTask, setNewRosterTask] = useState<string>("");
+  const [selectedPersonnelForRoster, setSelectedPersonnelForRoster] = useState<string[]>([]);
 
   // Malkhana item creation
   const [newMalkhanaTitle, setNewMalkhanaTitle] = useState<string>("");
@@ -567,6 +575,150 @@ Generate a balanced duty allocation for a safe Thana district environment. Retur
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // smart scheduling addition handlers
+  const handleAddPersonnel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPersonnelName.trim()) {
+      alert("पुलिसकर्मी का नाम दर्ज करना अनिवार्य है। Police officer name is mandatory.");
+      return;
+    }
+    const badgeVal = newPersonnelBadge.trim() || `HP-${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      const res = await fetch("/api/db/personnel/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newPersonnelName,
+          rank: newPersonnelRank,
+          badge: badgeVal,
+          dutyStatus: newPersonnelStatus
+        })
+      });
+      if (res.ok) {
+        await syncDatabase();
+        setNewPersonnelName("");
+        setNewPersonnelBadge("");
+        alert(isHindi ? "नया पुलिसकर्मी सफलतापुर्वक पंजीकृत किया गया!" : "New police officer registered successfully!");
+      } else {
+        throw new Error("Failed to add personnel");
+      }
+    } catch (err) {
+      const newPerson = {
+        id: `offline-p-${Date.now()}`,
+        name: newPersonnelName,
+        rank: newPersonnelRank,
+        badge: badgeVal,
+        dutyStatus: newPersonnelStatus
+      };
+      setDb(prev => {
+        const newDb = { ...prev, personnel: [...prev.personnel, newPerson] };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
+      setNewPersonnelName("");
+      setNewPersonnelBadge("");
+      alert(isHindi ? "ऑफलाइन मोड: नया पुलिसकर्मी स्थानीय रूप से पंजीकृत किया गया!" : "Offline mode: Registered officer locally!");
+    }
+  };
+
+  const handleDeletePersonnel = async (id: string) => {
+    if (!confirm(isHindi ? "क्या आप इस पुलिसकर्मी को हटाना चाहते हैं?" : "Are you sure you want to delete this officer?")) return;
+    try {
+      const res = await fetch("/api/db/personnel/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        await syncDatabase();
+      } else {
+        throw new Error("Failed to delete personnel");
+      }
+    } catch (err) {
+      setDb(prev => {
+        const newDb = { ...prev, personnel: prev.personnel.filter(p => p.id !== id) };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
+      alert(isHindi ? "ऑफलाइन मोड: पुलिसकर्मी को स्थानीय रूप से हटाया गया।" : "Offline mode: Deleted officer locally.");
+    }
+  };
+
+  const handleAddRosterShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRosterTask.trim()) {
+      alert("कार्य विवरण दर्ज करना अनिवार्य है। Strategic task details are required.");
+      return;
+    }
+    if (selectedPersonnelForRoster.length === 0) {
+      alert("कृपया कम से कम एक पुलिसकर्मी का चयन करें। Please assign at least one police officer.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/db/roster/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shift: newRosterShift,
+          personnel: selectedPersonnelForRoster,
+          task: newRosterTask
+        })
+      });
+      if (res.ok) {
+        await syncDatabase();
+        setNewRosterTask("");
+        setSelectedPersonnelForRoster([]);
+        alert(isHindi ? "नई ड्यूटी शिफ्ट सफलतापूर्वक जोड़ दी गई है!" : "New duty shift successfully created!");
+      } else {
+        throw new Error("Failed to add shift");
+      }
+    } catch (err) {
+      const newShift = {
+        id: `offline-dr-${Date.now()}`,
+        shift: newRosterShift,
+        personnel: selectedPersonnelForRoster,
+        task: newRosterTask
+      };
+      setDb(prev => {
+        const newDb = { ...prev, dutyRoster: [...prev.dutyRoster, newShift] };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
+      setNewRosterTask("");
+      setSelectedPersonnelForRoster([]);
+      alert(isHindi ? "ऑफलाइन मोड: नई ड्यूटी शिफ्ट स्थानीय रूप से जोड़ी गई।" : "Offline mode: Created duty shift locally.");
+    }
+  };
+
+  const handleDeleteRosterShift = async (id: string) => {
+    if (!confirm(isHindi ? "क्या आप इस ड्यूटी शिफ्ट को हटाना चाहते हैं?" : "Are you sure you want to delete this shift?")) return;
+    try {
+      const res = await fetch("/api/db/roster/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        await syncDatabase();
+      } else {
+        throw new Error("Failed to delete roster shift");
+      }
+    } catch (err) {
+      setDb(prev => {
+        const newDb = { ...prev, dutyRoster: prev.dutyRoster.filter(r => r.id !== id) };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
+      alert(isHindi ? "ऑफलाइन मोड: ड्यूटी शिफ्ट को स्थानीय रूप से हटाया गया।" : "Offline mode: Deleted duty shift locally.");
+    }
+  };
+
+  const toggleRosterPersonnelSelection = (name: string) => {
+    setSelectedPersonnelForRoster(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
   };
 
   // API Action: Download/Upload Armoury Data
@@ -2471,9 +2623,19 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
                           
                           <div className="flex justify-between items-center bg-slate-900/40 p-2 rounded border border-slate-850/50">
                             <span className="text-xs font-extrabold text-slate-100">{rost.shift}</span>
-                            <span className="bg-emerald-950 border border-emerald-900/60 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-bold">
-                              ACTIVE SHIFT CODE
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-emerald-950 border border-emerald-900/60 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-bold">
+                                {isHindi ? "सक्रिय" : "ACTIVE"}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteRosterShift(rost.id)}
+                                className="text-[10px] text-red-500 hover:text-red-400 bg-red-950/20 border border-red-950/30 hover:border-red-900/50 px-2 py-0.5 rounded font-bold transition flex items-center gap-1 cursor-pointer"
+                                title={isHindi ? "शिफ्ट हटाएं" : "Delete Shift"}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span className="hidden sm:inline">{isHindi ? "हटाएं" : "Delete"}</span>
+                              </button>
+                            </div>
                           </div>
 
                           <div className="space-y-1 text-xs">
@@ -2494,6 +2656,83 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
 
                         </div>
                       ))}
+                    </div>
+
+                    {/* Create Custom Duty Shift Form */}
+                    <div className="pt-6 border-t border-slate-850 mt-6">
+                      <form onSubmit={handleAddRosterShift} className="space-y-4">
+                        <div className="pb-2 border-b border-slate-850">
+                          <h4 className="font-bold text-xs uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
+                            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                            {isHindi ? "नई ड्यूटी शिफ्ट असाइन करें (Create Custom Duty Shift)" : "Assign Custom Duty Shift"}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {isHindi 
+                              ? "मैन्युअल रूप से विशिष्ट पुलिसकर्मियों को शिफ्ट और विशेष कार्य सौंपने के लिए।" 
+                              : "Manually construct a shift and commit assigned officers."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "शिफ्ट का चयन करें:" : "Select Shift Duration:"}</label>
+                          <select
+                            value={newRosterShift}
+                            onChange={(e) => setNewRosterShift(e.target.value)}
+                            className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="Morning Shift (06:00 AM - 02:00 PM)">{isHindi ? "सुबह की शिफ्ट (06:00 AM - 02:00 PM)" : "Morning Shift (06:00 AM - 02:00 PM)"}</option>
+                            <option value="Evening Shift (02:00 PM - 10:00 PM)">{isHindi ? "दोपहर/शाम की शिफ्ट (02:00 PM - 10:00 PM)" : "Evening Shift (02:00 PM - 10:00 PM)"}</option>
+                            <option value="Night Guard Shift (10:00 PM - 06:00 AM)">{isHindi ? "रात की गश्त शिफ्ट (10:00 PM - 06:00 AM)" : "Night Guard Shift (10:00 PM - 06:00 AM)"}</option>
+                            <option value="Emergency Quick Response Team (QRT)">{isHindi ? "आपातकालीन त्वरित प्रतिक्रिया टीम (QRT)" : "Emergency QRT Shift"}</option>
+                            <option value="Special Patrol Shift (Custom)">{isHindi ? "विशेष गश्त शिफ्ट (Custom)" : "Special Patrol Shift (Custom)"}</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "संबद्ध टीम कार्य विवरण:" : "Strategic Duty Task Details:"}</label>
+                          <textarea
+                            value={newRosterTask}
+                            onChange={(e) => setNewRosterTask(e.target.value)}
+                            rows={2}
+                            placeholder={isHindi ? "उदा. मार्केट एरिया और एटीएम लेन की सघन गश्त..." : "e.g. Heavy foot patrol at central market lanes..."}
+                            className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">
+                            {isHindi ? "ड्यूटी के लिए पुलिसकर्मी चुनें (असाइन करें):" : "Select & Assign Officers for Shift:"}
+                          </label>
+                          <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto bg-slate-950 p-2 rounded border border-slate-850">
+                            {db.personnel.map((p) => {
+                              const isSelected = selectedPersonnelForRoster.includes(p.name);
+                              return (
+                                <button
+                                  type="button"
+                                  key={p.id}
+                                  onClick={() => toggleRosterPersonnelSelection(p.name)}
+                                  className={`text-[10px] px-2.5 py-1 rounded transition border cursor-pointer ${
+                                    isSelected 
+                                      ? "bg-emerald-950 border-emerald-500 text-emerald-450 font-bold" 
+                                      : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                                  }`}
+                                >
+                                  {p.name} ({p.rank.split(" ")[0]})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-650 hover:bg-emerald-600 text-white font-bold py-2 rounded text-xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{isHindi ? "ड्यूटी शिफ्ट रोस्टर में शामिल करें" : "Assign Shift & Commit"}</span>
+                        </button>
+                      </form>
                     </div>
 
                   </div>
@@ -2577,12 +2816,103 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
                               <strong className="text-slate-200">{p.name}</strong>
                               <span className="text-slate-500 font-mono ml-2">[{p.rank}]</span>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {p.badge} ({p.dutyStatus})
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {p.badge} ({p.dutyStatus})
+                              </span>
+                              <button
+                                onClick={() => handleDeletePersonnel(p.id)}
+                                className="text-[9px] font-bold text-red-500 hover:text-red-400 px-1.5 py-0.5 rounded bg-red-950/20 border border-red-950/30 hover:border-red-900/50 transition cursor-pointer hover:underline"
+                                title={isHindi ? "पुलिसकर्मी हटाएं" : "Remove Officer"}
+                              >
+                                {isHindi ? "हटाएं" : "Del"}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Register New Police Officer Form */}
+                    <div className="pt-6 border-t border-slate-850 mt-6 font-sans">
+                      <form onSubmit={handleAddPersonnel} className="space-y-4">
+                        <div className="pb-2 border-b border-slate-850">
+                          <h4 className="font-bold text-xs uppercase text-slate-350 tracking-wider flex items-center gap-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            {isHindi ? "नया पुलिसकर्मी पंजीकृत करें" : "Register Police Officer"}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {isHindi 
+                              ? "थाने के पुलिस स्टाफ में नया अधिकारी जोड़ने के लिए।" 
+                              : "Add a new police officer to the active staff directory."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "नाम:" : "Full Name:"}</label>
+                          <input
+                            type="text"
+                            value={newPersonnelName}
+                            onChange={(e) => setNewPersonnelName(e.target.value)}
+                            placeholder={isHindi ? "उदा. कुलदीप कुमार" : "e.g. Kuldeep Kumar"}
+                            className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                            required
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "पद (Rank):" : "Rank:"}</label>
+                            <select
+                              value={newPersonnelRank}
+                              onChange={(e) => setNewPersonnelRank(e.target.value)}
+                              className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-2 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                            >
+                              <option value="SHO / Inspector">{isHindi ? "SHO / इंस्पेक्टर" : "SHO / Inspector"}</option>
+                              <option value="Sub-Inspector">{isHindi ? "सब-इंस्पेक्टर (SI)" : "Sub-Inspector (SI)"}</option>
+                              <option value="Head Constable">{isHindi ? "हेड कांस्टेबल (HC)" : "Head Constable (HC)"}</option>
+                              <option value="Constable">{isHindi ? "कांस्टेबल" : "Constable"}</option>
+                              <option value="Home Guard">{isHindi ? "होम गार्ड" : "Home Guard"}</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "बैज नंबर (वैकल्पिक):" : "Badge No (Opt):"}</label>
+                            <input
+                              type="text"
+                              value={newPersonnelBadge}
+                              onChange={(e) => setNewPersonnelBadge(e.target.value)}
+                              placeholder={isHindi ? "उदा. HP-8942" : "e.g. HP-8942"}
+                              className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-2 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase block">{isHindi ? "ड्यूटी स्थिति (Status):" : "Duty Status:"}</label>
+                          <select
+                            value={newPersonnelStatus}
+                            onChange={(e) => setNewPersonnelStatus(e.target.value)}
+                            className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="On Station">{isHindi ? "थाने पर उपस्थित (On Station)" : "On Station"}</option>
+                            <option value="Beat Patrol">{isHindi ? "गश्त ड्यूटी (Beat Patrol)" : "Beat Patrol"}</option>
+                            <option value="Lockup Guard">{isHindi ? "हवालात गार्ड (Lockup Guard)" : "Lockup Guard"}</option>
+                            <option value="Desk Duty">{isHindi ? "कार्यालय कार्य (Desk Duty)" : "Desk Duty"}</option>
+                            <option value="Investigating">{isHindi ? "जांच/विवेचना में (Investigating)" : "Investigating"}</option>
+                            <option value="Court Duty">{isHindi ? "न्यायालय पैरवी (Court Duty)" : "Court Duty"}</option>
+                            <option value="On Leave">{isHindi ? "अवकाश पर (On Leave)" : "On Leave"}</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-emerald-650 hover:bg-emerald-600 text-white font-bold py-2 rounded text-xs transition active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{isHindi ? "पुलिसकर्मी पंजीकृत करें" : "Register Officer"}</span>
+                        </button>
+                      </form>
                     </div>
 
                   </div>

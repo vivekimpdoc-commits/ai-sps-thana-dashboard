@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "restore-app": "node -e \"const fs = require('fs'); const { execSync } = require('child_process'); fs.writeFileSync('src/App.tsx', execSync('git show HEAD:src/App.tsx'));\"",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",

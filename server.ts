@@ -248,6 +248,61 @@ app.post("/api/db/roster/update", (req: Request, res: Response) => {
   }
 });
 
+app.post("/api/db/roster/add", (req: Request, res: Response) => {
+  const newShift = {
+    id: `dr-${Date.now()}`,
+    shift: req.body.shift || "Custom Shift",
+    personnel: req.body.personnel || [],
+    task: req.body.task || "General Duties"
+  };
+  db.dutyRoster.push(newShift);
+  res.status(201).json(newShift);
+});
+
+app.post("/api/db/roster/delete", (req: Request, res: Response) => {
+  const { id } = req.body;
+  const index = db.dutyRoster.findIndex(r => r.id === id);
+  if (index !== -1) {
+    db.dutyRoster.splice(index, 1);
+    res.json({ success: true, roster: db.dutyRoster });
+  } else {
+    res.status(404).json({ error: "Shift not found" });
+  }
+});
+
+app.post("/api/db/personnel/add", (req: Request, res: Response) => {
+  const newPerson = {
+    id: `p-${Date.now()}`,
+    name: req.body.name || "Officer",
+    rank: req.body.rank || "Constable",
+    badge: req.body.badge || `HP-${Math.floor(1000 + Math.random() * 9000)}`,
+    dutyStatus: req.body.dutyStatus || "On Station"
+  };
+  db.personnel.push(newPerson);
+  res.status(201).json(newPerson);
+});
+
+app.post("/api/db/personnel/delete", (req: Request, res: Response) => {
+  const { id } = req.body;
+  const index = db.personnel.findIndex(p => p.id === id);
+  if (index !== -1) {
+    db.personnel.splice(index, 1);
+    res.json({ success: true, personnel: db.personnel });
+  } else {
+    res.status(404).json({ error: "Personnel not found" });
+  }
+});
+
+app.post("/api/db/personnel/update", (req: Request, res: Response) => {
+  const { personnel } = req.body;
+  if (personnel && Array.isArray(personnel)) {
+    db.personnel = personnel;
+    res.json({ success: true, personnel: db.personnel });
+  } else {
+    res.status(400).json({ error: "Invalid personnel format" });
+  }
+});
+
 
 // 2. SERVER-SIDE GEMINI API INTENTIONS
 
