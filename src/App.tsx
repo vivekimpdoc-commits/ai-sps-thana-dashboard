@@ -502,6 +502,67 @@ Generate a balanced duty allocation for a safe Thana district environment. Retur
     }
   };
 
+  // API Action: Download/Upload Roster Data
+  const downloadRoster = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.dutyRoster, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `duty_roster_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to download roster data.");
+    }
+  };
+
+  const handleRosterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed)) {
+          const isValid = parsed.every(item => item.shift && Array.isArray(item.personnel) && item.task);
+          if (!isValid) {
+            alert(isHindi 
+              ? "गलत फ़ाइल प्रारूप! प्रत्येक शिफ्ट में shift, personnel (list) और task होना चाहिए।" 
+              : "Invalid format! Each shift must contain 'shift', 'personnel' array, and 'task'.");
+            return;
+          }
+          try {
+            const saveRes = await fetch("/api/db/roster/update", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ rosters: parsed })
+            });
+            if (saveRes.ok) {
+              await syncDatabase();
+              alert(isHindi ? "रोस्टर सफलतापूर्वक अपलोड और अपडेट किया गया!" : "Roster successfully uploaded and updated!");
+            } else {
+              throw new Error("API failed");
+            }
+          } catch (apiErr) {
+            setDb(prev => {
+              const newDb = { ...prev, dutyRoster: parsed };
+              localStorage.setItem("thana_db", JSON.stringify(newDb));
+              return newDb;
+            });
+            alert(isHindi ? "ऑफ़लाइन मोड: रोस्टर स्थानीय रूप से अपलोड किया गया!" : "Offline mode: Roster uploaded locally!");
+          }
+        } else {
+          alert(isHindi ? "फ़ाइल एक वैलिड ऐरे (Array) होनी चाहिए।" : "File must be a valid JSON array.");
+        }
+      } catch (err) {
+        alert(isHindi ? "फ़ाइल को पढ़ने में त्रुटि आई। कृपया वैलिड JSON फ़ाइल चुनें।" : "Error parsing file. Please upload a valid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   // API Action: Weapon Checkout Out/In sign
   const handleWeaponSign = async (armId: string, mode: "out" | "in") => {
     try {
@@ -2144,6 +2205,33 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
                       </h4>
                       <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40">
                         {db.dutyRoster.length} Main Shifts Active
+                      </span>
+                    </div>
+
+                    {/* Data Import/Export Panel */}
+                    <div className="flex flex-wrap items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs">
+                      <span className="text-slate-400 font-medium">💾 {isHindi ? "डाटा प्रविष्टि:" : "Data Entry:"}</span>
+                      
+                      <button
+                        onClick={downloadRoster}
+                        type="button"
+                        className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        📥 {isHindi ? "डाउनलोड (JSON)" : "Download (JSON)"}
+                      </button>
+
+                      <label className="bg-slate-900 hover:bg-slate-800 text-blue-400 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded font-bold transition flex items-center gap-1.5 cursor-pointer">
+                        📤 {isHindi ? "अपलोड (JSON)" : "Upload (JSON)"}
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleRosterUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      
+                      <span className="text-[10px] text-slate-500 hidden sm:inline">
+                        {isHindi ? "(*.json फ़ाइल)" : "(Supports *.json)"}
                       </span>
                     </div>
 
