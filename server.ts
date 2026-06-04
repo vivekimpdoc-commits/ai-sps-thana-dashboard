@@ -186,6 +186,31 @@ app.post("/api/db/armoury/assign", (req: Request, res: Response) => {
   res.json(arm);
 });
 
+app.post("/api/db/armoury/add", (req: Request, res: Response) => {
+  const newItem = {
+    id: `a-${Date.now()}`,
+    name: req.body.name || "Weapon/Item",
+    category: req.body.category || "General",
+    total: parseInt(req.body.total, 10) || 0,
+    secured: parseInt(req.body.total, 10) || 0,
+    out: 0,
+    condition: req.body.condition || "Operational",
+    checks: req.body.checks || `Checked ${new Date().toLocaleDateString('en-IN')}`
+  };
+  db.armoury.push(newItem);
+  res.status(201).json(newItem);
+});
+
+app.post("/api/db/armoury/update", (req: Request, res: Response) => {
+  const { armoury } = req.body;
+  if (armoury && Array.isArray(armoury)) {
+    db.armoury = armoury;
+    res.json({ success: true, armoury: db.armoury });
+  } else {
+    res.status(400).json({ error: "Invalid armoury format" });
+  }
+});
+
 app.post("/api/db/malkhana/add", (req: Request, res: Response) => {
   const newItem = {
     id: `m-${Date.now()}`,

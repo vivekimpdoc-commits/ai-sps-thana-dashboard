@@ -197,6 +197,12 @@ export default function App() {
   const [newMalkhanaNo, setNewMalkhanaNo] = useState<string>("");
   const [newMalkhanaStatus, setNewMalkhanaStatus] = useState<string>("Sealed with Lacquer Stamp");
 
+  // Armoury item creation
+  const [newArmouryName, setNewArmouryName] = useState<string>("");
+  const [newArmouryCategory, setNewArmouryCategory] = useState<string>("Pistols");
+  const [newArmouryTotal, setNewArmouryTotal] = useState<number>(0);
+  const [newArmouryCondition, setNewArmouryCondition] = useState<string>("Excellent");
+
   // Lockup Action Target
   const [selectedInmateId, setSelectedInmateId] = useState<string>("l1");
   const [newSafetyStatus, setNewSafetyStatus] = useState<string>("Sleeping peaceful under guard");
@@ -561,6 +567,117 @@ Generate a balanced duty allocation for a safe Thana district environment. Retur
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // API Action: Download/Upload Armoury Data
+  const downloadArmoury = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.armoury, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `armoury_inventory_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to download armoury data.");
+    }
+  };
+
+  const handleArmouryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed)) {
+          const isValid = parsed.every(item => item.name && item.category && typeof item.total === 'number' && typeof item.secured === 'number' && typeof item.out === 'number');
+          if (!isValid) {
+            alert(isHindi 
+              ? "गलत फ़ाइल प्रारूप! प्रत्येक वस्तु में name, category, total (number), secured (number) और out (number) होना चाहिए।" 
+              : "Invalid format! Each item must contain name, category, total (number), secured (number), and out (number).");
+            return;
+          }
+          try {
+            const saveRes = await fetch("/api/db/armoury/update", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ armoury: parsed })
+            });
+            if (saveRes.ok) {
+              await syncDatabase();
+              alert(isHindi ? "आयुध भंडार सफलतापूर्वक अपलोड और अपडेट किया गया!" : "Armoury successfully uploaded and updated!");
+            } else {
+              throw new Error("API failed");
+            }
+          } catch (apiErr) {
+            setDb(prev => {
+              const newDb = { ...prev, armoury: parsed };
+              localStorage.setItem("thana_db", JSON.stringify(newDb));
+              return newDb;
+            });
+            alert(isHindi ? "ऑफ़लाइन मोड: आयुध भंडार स्थानीय रूप से अपलोड किया गया!" : "Offline mode: Armoury uploaded locally!");
+          }
+        } else {
+          alert(isHindi ? "फ़ाइल एक वैलिड ऐरे (Array) होनी चाहिए।" : "File must be a valid JSON array.");
+        }
+      } catch (err) {
+        alert(isHindi ? "फ़ाइल को पढ़ने में त्रुटि आई। कृपया वैलिड JSON फ़ाइल चुनें।" : "Error parsing file. Please upload a valid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleAddArmouryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newArmouryName.trim()) {
+      alert("नाम दर्ज करना अनिवार्य है। Item name is mandatory.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/db/armoury/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newArmouryName,
+          category: newArmouryCategory,
+          total: newArmouryTotal,
+          condition: newArmouryCondition
+        })
+      });
+      if (res.ok) {
+        await syncDatabase();
+        setNewArmouryName("");
+        setNewArmouryTotal(0);
+        alert(isHindi ? "आयुध भंडार में नई वस्तु दर्ज!" : "New Armoury item added successfully!");
+      } else {
+        throw new Error("Failed to add Armoury item");
+      }
+    } catch (err) {
+      const fakeItem = {
+        id: `offline-a-${Date.now()}`,
+        name: newArmouryName,
+        category: newArmouryCategory,
+        total: newArmouryTotal,
+        secured: newArmouryTotal,
+        out: 0,
+        condition: newArmouryCondition,
+        checks: `Checked ${new Date().toLocaleDateString('en-IN')}`
+      };
+      setDb((prev) => {
+        const newDb = {
+          ...prev,
+          armoury: [...prev.armoury, fakeItem]
+        };
+        localStorage.setItem("thana_db", JSON.stringify(newDb));
+        return newDb;
+      });
+      setNewArmouryName("");
+      setNewArmouryTotal(0);
+      alert(isHindi ? "स्थानीय मोड: नई वस्तु स्थानीय रूप से जोड़ी गई!" : "Offline mode: New item added locally!");
+    }
   };
 
   // API Action: Weapon Checkout Out/In sign
@@ -1958,57 +2075,170 @@ Answer in a direct, clear, highly legal yet practical manner. Use neat bullet po
                   </p>
                 </div>
 
-                {/* Weapons Registry Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {db.armoury.map((arm) => (
-                    <div key={arm.id} className="bg-slate-900/50 border border-slate-800 hover:border-slate-750 transition rounded-2xl p-5 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  
+                  {/* Weapons Registry Grid - 8 cols */}
+                  <div className="lg:col-span-8 space-y-4">
+                    
+                    {/* Data Import/Export Panel */}
+                    <div className="flex flex-wrap items-center gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs">
+                      <span className="text-slate-400 font-medium">💾 {isHindi ? "डाटा प्रविष्टि:" : "Data Entry:"}</span>
                       
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-[9px] font-bold text-purple-400 uppercase tracking-widest bg-purple-950/40 px-2 py-0.5 rounded border border-purple-900/35">
-                            {arm.category}
-                          </span>
-                          <h4 className="font-bold text-slate-100 text-base mt-2">{arm.name}</h4>
-                          <p className="text-[10px] text-slate-500 mt-0.5">Condition Level: {arm.condition}</p>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-850">
-                          {arm.total} Total
-                        </span>
-                      </div>
+                      <button
+                        onClick={downloadArmoury}
+                        type="button"
+                        className="bg-slate-900 hover:bg-slate-800 text-purple-400 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        📥 {isHindi ? "डाउनलोड (JSON)" : "Download (JSON)"}
+                      </button>
 
-                      <div className="grid grid-cols-2 gap-2 text-center text-xs bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                        <div className="border-r border-slate-850 pr-2">
-                          <span className="text-[9px] text-slate-500 uppercase font-black block">Secured</span>
-                          <span className="text-sm font-extrabold text-emerald-450 font-mono">{arm.secured} units</span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] text-slate-500 uppercase font-black block">Assigned / Out</span>
-                          <span className="text-sm font-extrabold text-purple-400 font-mono">{arm.out} units</span>
-                        </div>
-                      </div>
-
-                      {/* Out Assignment controllers */}
-                      <div className="flex justify-between items-center pt-2 gap-2">
-                        <button
-                          onClick={() => handleWeaponSign(arm.id, "in")}
-                          disabled={arm.out === 0}
-                          className="flex-1 text-[11px] font-bold py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-900 text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition flex items-center justify-center gap-1"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5 text-slate-450" />
-                          <span>{isHindi ? "जमा करें (Sign In)" : "Sign Weapon In"}</span>
-                        </button>
-                        <button
-                          onClick={() => handleWeaponSign(arm.id, "out")}
-                          disabled={arm.secured === 0}
-                          className="flex-1 text-[11px] font-black py-1.5 px-3 rounded-lg bg-purple-650 hover:bg-purple-600 text-white disabled:opacity-30 disabled:pointer-events-none transition flex items-center justify-center gap-1"
-                        >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>{isHindi ? "इशू करें (Sign Out)" : "Assign / Check Out"}</span>
-                        </button>
-                      </div>
-
+                      <label className="bg-slate-900 hover:bg-slate-800 text-blue-400 border border-slate-800 hover:border-slate-700 px-3 py-1.5 rounded font-bold transition flex items-center gap-1.5 cursor-pointer">
+                        📤 {isHindi ? "अपलोड (JSON)" : "Upload (JSON)"}
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleArmouryUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      
+                      <span className="text-[10px] text-slate-500 hidden sm:inline">
+                        {isHindi ? "(*.json फ़ाइल)" : "(Supports *.json)"}
+                      </span>
                     </div>
-                  ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {db.armoury.map((arm) => (
+                        <div key={arm.id} className="bg-slate-900/50 border border-slate-800 hover:border-slate-750 transition rounded-2xl p-5 space-y-4">
+                          
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[9px] font-bold text-purple-400 uppercase tracking-widest bg-purple-950/40 px-2 py-0.5 rounded border border-purple-900/35">
+                                {arm.category}
+                              </span>
+                              <h4 className="font-bold text-slate-100 text-base mt-2">{arm.name}</h4>
+                              <p className="text-[10px] text-slate-500 mt-0.5">Condition Level: {arm.condition}</p>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-850">
+                              {arm.total} Total
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-center text-xs bg-slate-950 p-2.5 rounded-lg border border-slate-850">
+                            <div className="border-r border-slate-850 pr-2">
+                              <span className="text-[9px] text-slate-500 uppercase font-black block">Secured</span>
+                              <span className="text-sm font-extrabold text-emerald-450 font-mono">{arm.secured} units</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-500 uppercase font-black block">Assigned / Out</span>
+                              <span className="text-sm font-extrabold text-purple-400 font-mono">{arm.out} units</span>
+                            </div>
+                          </div>
+
+                          {/* Out Assignment controllers */}
+                          <div className="flex justify-between items-center pt-2 gap-2">
+                            <button
+                              onClick={() => handleWeaponSign(arm.id, "in")}
+                              disabled={arm.out === 0}
+                              className="flex-1 text-[11px] font-bold py-1.5 px-3 rounded-lg border border-slate-800 bg-slate-950 hover:bg-slate-900 text-slate-300 disabled:opacity-30 disabled:pointer-events-none transition flex items-center justify-center gap-1"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-slate-450" />
+                              <span>{isHindi ? "जमा करें (Sign In)" : "Sign Weapon In"}</span>
+                            </button>
+                            <button
+                              onClick={() => handleWeaponSign(arm.id, "out")}
+                              disabled={arm.secured === 0}
+                              className="flex-1 text-[11px] font-black py-1.5 px-3 rounded-lg bg-purple-650 hover:bg-purple-600 text-white disabled:opacity-30 disabled:pointer-events-none transition flex items-center justify-center gap-1"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>{isHindi ? "इशू करें (Sign Out)" : "Assign / Check Out"}</span>
+                            </button>
+                          </div>
+
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Register New Armoury Item Form - 4 cols */}
+                  <div className="lg:col-span-4 bg-slate-900/30 border border-slate-800 p-6 rounded-2xl h-fit">
+                    <form onSubmit={handleAddArmouryItem} className="space-y-4">
+                      
+                      <div className="pb-2 border-b border-slate-850 mb-3">
+                        <h4 className="font-bold text-xs uppercase text-slate-350 tracking-wider">
+                          +{isHindi ? "नया सामान/हथियार दर्ज करें" : "Register Armoury Item"}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          {isHindi ? "आयुध भंडार रजिस्टर में नया आग्नेयास्त्र या सुरक्षा उपकरण जोड़ें।" : "Log new firearm, ammo, or protection gear specifications here."}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{isHindi ? "सामान/हथियार का नाम" : "Weapon / Item Name:"}</label>
+                        <input
+                          type="text"
+                          value={newArmouryName}
+                          onChange={(e) => setNewArmouryName(e.target.value)}
+                          placeholder={isHindi ? "उदा. INSAS राइफल 5.56mm" : "e.g. INSAS Rifle 5.56mm"}
+                          className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-purple-500"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{isHindi ? "श्रेणी (Category)" : "Category:"}</label>
+                        <select
+                          value={newArmouryCategory}
+                          onChange={(e) => setNewArmouryCategory(e.target.value)}
+                          className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="Rifles">{isHindi ? "राइफल्स (Rifles)" : "Rifles"}</option>
+                          <option value="Pistols">{isHindi ? "पिस्तौल (Pistols)" : "Pistols"}</option>
+                          <option value="Ammunition">{isHindi ? "कारतूस / बारूद (Ammunition)" : "Ammunition"}</option>
+                          <option value="Riot Control">{isHindi ? "दंगा नियंत्रण (Riot Control)" : "Riot Control"}</option>
+                          <option value="Safety Gear">{isHindi ? "सुरक्षात्मक गियर (Safety Gear)" : "Safety Gear"}</option>
+                          <option value="Other">{isHindi ? "अन्य (Other)" : "Other"}</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{isHindi ? "कुल संख्या (Total Stock)" : "Total Quantity:"}</label>
+                        <input
+                          type="number"
+                          value={newArmouryTotal === 0 ? "" : newArmouryTotal}
+                          onChange={(e) => setNewArmouryTotal(parseInt(e.target.value, 10) || 0)}
+                          placeholder="e.g. 10"
+                          className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-purple-500"
+                          min="0"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">{isHindi ? "हालत / स्थिति" : "Condition Level:"}</label>
+                        <select
+                          value={newArmouryCondition}
+                          onChange={(e) => setNewArmouryCondition(e.target.value)}
+                          className="w-full bg-slate-950 text-slate-100 text-xs py-2 px-3 rounded border border-slate-800 focus:outline-none focus:border-purple-500"
+                        >
+                          <option value="Excellent">{isHindi ? "उत्कृष्ट (Excellent)" : "Excellent"}</option>
+                          <option value="Serviced">{isHindi ? "सत्यापित/सर्विस की गई (Serviced)" : "Serviced"}</option>
+                          <option value="Operational">{isHindi ? "कार्यशील (Operational)" : "Operational"}</option>
+                          <option value="Requires Check">{isHindi ? "जांच की आवश्यकता (Requires Check)" : "Requires Check"}</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-purple-650 hover:bg-purple-600 font-bold p-2.5 rounded-lg text-white text-xs transition active:scale-95 flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{isHindi ? "रजिस्टर में दर्ज करें" : "Add Armoury Item"}</span>
+                      </button>
+
+                    </form>
+                  </div>
+
                 </div>
 
                 {/* Secure Armoury Rules reminder */}
